@@ -6,10 +6,11 @@ int fan=11;
 int solA=10;
 int solB=9;
 
-int pressure_sensor = A0; int pressure_high = 90; int pressure_low = 20;
-int purity_sensor = A1; int purity_high = 96; int purity_low = 50; // oxygen analyzer
+float flow_sensor = 0.0, flow_sensor_high = 90.0, flow_sensor_low = 20.0;
+float O2concentration = 0, O2concentration_high = 96.0, O2concentration_low = 50.0; 
+int temperature = 0, temp_high = 100, temp_low = 20;
 
-int delay_millis = 1000;
+int MAX_MILLIS_TO_WAIT = 100;
 
 void Right();
 void Left();
@@ -17,24 +18,31 @@ void powerOff();
 void check_purity();
 void check_pressure();
 void check_all();
-void testPrint();
+void readSensor();
 
-SoftwareSerial mySerial(3,2); // Rx, Tx
-SoftwareSerial mySerial2(4,5); // Rx, Tx
+int tx_pin = 19;
+int rx_pin = 18;
+//SoftwareSerial Serial1(rx_pin, tx_pin); // Rx, Tx
+byte reading[12]; // byte array where the Serial readings are stored.
+boolean dataAvailable;
+
+
 void setup()
 
 { 
-  Serial.begin(9600);
-  mySerial.begin(9600);
-  //mySerial2.begin(9600);
-  //while(!Serial){};
-  //while(!mySerial){};
+  pinMode (rx_pin,INPUT);
+  pinMode (tx_pin,OUTPUT);
   
   pinMode (compressor,OUTPUT);
   pinMode (fan,OUTPUT);
   pinMode (solA,OUTPUT);
   pinMode (solB,OUTPUT);
- 
+
+  Serial.begin(9600);
+  Serial1.begin(9600);
+  //while(!Serial){};
+  //while(!Serial1){};
+  
   digitalWrite (compressor,HIGH); 
   digitalWrite (fan,HIGH); 
   digitalWrite (solA,HIGH); 
@@ -46,12 +54,9 @@ void setup()
 
 void loop()
 {  
-//  Right();
-//  delay(delay_millis);
-//  Left();
-//  delay(delay_millis);
+  dataAvailable = false;
 
-  testPrint();
+  readSensor();
   check_all();
 }
 
@@ -78,43 +83,16 @@ void powerOff()
 
 void check_purity() 
 {
-  purity_sensor = 1*purity_sensor;  // volt to real sensor value
    
-    if ( purity_sensor > purity_high )
-  {
-    // alarm
-    // power off
-  }
-  else if (purity_sensor < purity_low)
-  {
-    // only alarm
-  }
-  else 
-  {
-    // all ok
-  } 
+
 }
 
 
 void check_pressure()
 {
-  pressure_sensor = 1*pressure_sensor; // volt to real sensor
-  if ( pressure_sensor > pressure_high )
-  {
-    // alarm
-    // power off
-  }
-  else if (pressure_sensor < pressure_low)
-  {
-    // only alarm
-  }
-  else 
-  {
-    // all ok
-  }
+  
+
 }
-
-
 
 void check_all()
 {
@@ -122,16 +100,48 @@ void check_all()
   check_pressure();
 }
 
-void testPrint()
+void readSensor()
 {
-//  if( mySerial.available() )
-//  {
-//    Serial.write( mySerial.read() );
-//  }
-
-    while (mySerial.available()> 12) {
-    char inChar = (char)mySerial.read();
-    Serial.write(inChar);
-    //mySerial2.print(inChar);
+  byte message[] = { 0x11, 0x01, 0x01, 0xED }; //11 01 01 ED
+  Serial1.write(message, sizeof(message));
+  //Serial1.listen();
+  unsigned long starttime= millis();
+  
+  while ( (Serial1.available() <12 ) && ((millis() - starttime) < MAX_MILLIS_TO_WAIT) ) {      
+    // not finished jet.
   }
- }
+  if(Serial1.available() < 12) {
+    // not finished jet.
+  }
+  else
+  {
+    for(int n=0; n < 12; n++) {
+      reading[n] = Serial1.read(); 
+    }
+    dataAvailable = true; 
+  }
+
+  /*** Interpreting the data. ***/
+
+  if (dataAvailable == true) {
+
+    //result = reading[7] * 256 + reading[8]; // the readable version.
+
+    int result1 = (int)(reading[3] << 8) | reading[4]; // the bitwise, super efficient version.
+    int result2 = (int)(reading[5] << 8) | reading[6];
+    int result3 = (int)(reading[7] << 8) | reading[8];
+    O2concentration = result1/10.0; // measured concentration in %
+    flow_sensor = result2/10.0;
+    temperature = result3/10;
+
+  }
+
+  /*** Send the extracted sensor value to other device over softserial. ***/
+  Serial.println("O2 status = " + String(O2concentration) + "%");
+  Serial.println("flow = " + String(flow_sensor) + "%");
+  Serial.println("temperature = " + String(temperature) + "C");
+  //Serial.println(O2concentration);
+  delay(100);
+
+  
+}

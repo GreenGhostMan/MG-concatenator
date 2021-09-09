@@ -1,4 +1,3 @@
-
 void check_purity() 
 {
    

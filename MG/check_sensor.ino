@@ -1,18 +1,7 @@
-void check_purity() 
+
+
+void check_sensor()
 {
-   
-
-}
-
-
-void check_pressure()
-{
-  
-
-}
-
-void check_all()
-{
-  check_purity();
-  check_pressure();
+  //check_purity();
+  //check_pressure();
 }
